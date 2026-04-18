@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es" class="dark"> 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>S&F Atelier - POS Pro</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>tailwind.config = { darkMode: 'class' }</script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 text-gray-900 dark:bg-neutral-950 dark:text-gray-100 h-screen overflow-hidden flex flex-col lg:flex-row font-sans">
+
+    <div id="loginScreen" class="fixed inset-0 bg-gray-200 dark:bg-neutral-950 z-[100] flex justify-center items-center p-4">
+        <div class="bg-white dark:bg-neutral-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-300 dark:border-neutral-800 w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-yellow-500 tracking-tight">S&F Atelier</h1>
+                <h2 class="text-sm text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest font-semibold" data-i18n="login_subtitle">Acceso Restringido</h2>
+            </div>
+            <form id="loginForm" class="space-y-4 sm:space-y-5">
+                <div>
+                    <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1" data-i18n="email">Correo Electrónico</label>
+                    <input type="email" id="auth_email" class="w-full bg-gray-50 dark:bg-neutral-950 border border-gray-300 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1" data-i18n="password">Contraseña</label>
+                    <input type="password" id="auth_pass" class="w-full bg-gray-50 dark:bg-neutral-950 border border-gray-300 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" required>
+                </div>
+                <button type="submit" id="btnLogin" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 sm:py-4 rounded-lg transition shadow-lg mt-2" data-i18n="btn_login">
+                    Iniciar Sesión
+                </button>
+                <p id="loginError" class="text-red-500 text-sm text-center hidden mt-2"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="mainApp" class="w-full h-full flex flex-col lg:flex-row hidden opacity-0 transition-opacity duration-500">
+        
+        <div class="lg:hidden flex flex-col bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800 z-20 shadow-sm">
+            <div class="p-4 flex justify-between items-center">
+                <h1 class="text-xl font-extrabold text-yellow-500 tracking-tight leading-none">S&F Atelier</h1>
+                <div class="flex gap-2">
+                    <button onclick="switchView('dashboard')" class="p-2 text-gray-500 hover:text-yellow-500 transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></button>
+                    <button onclick="switchView('pos')" class="p-2 text-gray-500 hover:text-yellow-500 transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></button>
+                    <button onclick="toggleSettings()" class="p-2 text-gray-500 hover:text-yellow-500 transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></button>
+                </div>
+            </div>
+            <div class="flex overflow-x-auto gap-2 px-4 pb-3 scrollbar-hide whitespace-nowrap" id="mobile_category_filters"></div>
+        </div>
+
+<div class="hidden lg:flex w-64 h-full bg-white dark:bg-neutral-900 border-r border-gray-200 dark:border-neutral-800 flex-col z-20 shadow-lg shrink-0">
+            <div class="p-6 border-b border-gray-200 dark:border-neutral-800">
+                <h1 class="text-2xl font-extrabold text-yellow-500 tracking-tight leading-none">S&F Atelier</h1>
+                <h2 class="text-xs text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest font-semibold" data-i18n="pos_terminal">Terminal POS</h2>
+            </div>
+            
+            <div class="p-4 space-y-2 border-b border-gray-200 dark:border-neutral-800">
+                
+                <button onclick="switchView('pos')" id="nav_pos" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold bg-yellow-500 text-black transition shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <span>Terminal POS</span>
+                </button>
+                
+                <button onclick="switchView('dashboard')" id="nav_dash" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span>Historial & Reimpresión</span>
+                </button>
+
+                <button onclick="window.open('https://syf-atelier.streamlit.app', '_blank')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    <span>Dashboard Avanzado</span>
+                    <svg class="w-4 h-4 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </button>
+
+                <button onclick="toggleSettings()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+                    <span>Configuración</span>
+                </button>
+            </div>
+            
+            <div class="p-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Catálogo</div>
+            <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2 scrollbar-hide" id="desktop_category_filters"></div>
+        </div>
+
+        <div id="view_pos" class="flex-1 h-full flex flex-col relative bg-gray-50 dark:bg-[#0a0a0a]">
+            <div class="p-4 lg:p-6 border-b border-gray-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur flex justify-between items-center z-10 shrink-0">
+                <h2 class="text-lg lg:text-xl font-bold text-gray-800 dark:text-gray-200" id="current_category_title" data-i18n="all_furniture">Todos los Muebles</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 lg:p-6 pb-28 lg:pb-6 scrollbar-hide">
+                <div id="products_grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4"></div>
+            </div>
+
+            <div class="lg:hidden absolute bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-white dark:from-neutral-950 via-white/90 dark:via-neutral-950/90 to-transparent z-20">
+                <button onclick="toggleMobileCart()" class="w-full bg-gray-900 dark:bg-neutral-800 text-white border border-gray-800 font-bold py-4 px-5 rounded-2xl shadow-2xl flex justify-between items-center active:scale-95 transition-transform">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-yellow-500 text-black text-sm px-3 py-1 rounded-full font-black" id="mob_cart_badge">0</div>
+                        <span data-i18n="view_order" class="text-lg">Ver Orden</span>
+                    </div>
+                    <span class="text-yellow-400 font-black text-xl" id="mob_cart_total">$0</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="view_dashboard" class="flex-1 flex flex-col relative bg-gray-50 dark:bg-[#0a0a0a] h-full hidden overflow-y-auto scrollbar-hide">
+            <div class="p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+                
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                    <div>
+                        <h2 class="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white">Panel de Control</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Resumen de operaciones y auditoría de ventas.</p>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white dark:bg-neutral-900 p-2 rounded-xl border border-gray-200 dark:border-neutral-800 shadow-sm w-full sm:w-auto">
+                        <input type="date" id="dash_filter_date" class="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <button onclick="loadDashboardData()" class="bg-yellow-500 text-black px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-yellow-400 transition">Filtrar</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-gray-200 dark:border-neutral-800 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Ingresos (Filtro)</h3>
+                            <div class="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        </div>
+                        <p class="text-3xl font-black text-gray-900 dark:text-white" id="kpi_revenue">$0</p>
+                    </div>
+                    <div class="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-gray-200 dark:border-neutral-800 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Órdenes Procesadas</h3>
+                            <div class="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg></div>
+                        </div>
+                        <p class="text-3xl font-black text-gray-900 dark:text-white" id="kpi_orders">0</p>
+                    </div>
+                    <div class="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-gray-200 dark:border-neutral-800 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Ticket Promedio</h3>
+                            <div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
+                        </div>
+                        <p class="text-3xl font-black text-gray-900 dark:text-white" id="kpi_avg">$0</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-gray-200 dark:border-neutral-800 shadow-sm lg:col-span-1 hidden lg:flex flex-col">
+                        <h3 class="text-lg font-bold mb-4 text-gray-900 dark:text-white shrink-0">Tendencia (Últimos 7 días)</h3>
+                        <div class="relative flex-1 w-full min-h-[250px]">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-200 dark:border-neutral-800 shadow-sm lg:col-span-2 flex flex-col h-[500px]">
+                        <div class="p-4 border-b border-gray-200 dark:border-neutral-800">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Registro de Transacciones</h3>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 scrollbar-hide">
+                            <div id="history_list" class="space-y-3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="cartBackdrop" onclick="toggleMobileCart()" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 hidden lg:hidden transition-opacity"></div>
+
+        <div id="cartPanel" class="fixed lg:static inset-y-0 right-0 z-40 w-full sm:w-[400px] bg-white dark:bg-neutral-900 flex flex-col shadow-2xl transform translate-x-full lg:translate-x-0 transition-transform duration-300 border-l border-gray-200 dark:border-neutral-800 shrink-0">
+            <div class="p-4 lg:p-6 bg-gray-50 dark:bg-neutral-950 border-b border-gray-200 dark:border-neutral-800 flex justify-between items-center shrink-0">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100" data-i18n="current_ticket">Ticket Actual</h2>
+                    <p class="text-xs text-yellow-600 dark:text-yellow-500 font-medium mt-1" id="current_date"></p>
+                </div>
+                <button onclick="toggleMobileCart()" class="lg:hidden p-2 text-gray-500 bg-gray-200 dark:bg-neutral-800 rounded-full active:scale-90"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3" id="cart_items"></div>
+            <div class="p-4 lg:p-6 bg-gray-50 dark:bg-neutral-950 border-t border-gray-200 dark:border-neutral-800 shrink-0 pb-8 lg:pb-6">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400 text-sm mb-3">
+                    <span data-i18n="subtotal">Subtotal</span><span id="summary_subtotal">$0</span>
+                </div>
+                <div class="flex items-center justify-between text-gray-600 dark:text-gray-400 text-sm mb-4 bg-white dark:bg-neutral-900 p-3 rounded-lg border border-gray-200 dark:border-neutral-700">
+                    <span data-i18n="discount">Descuento global</span>
+                    <div class="flex items-center">
+                        <span class="mr-1 font-bold text-red-500">-$</span>
+                        <input type="number" id="global_discount" value="0" class="w-24 bg-transparent border-none text-right text-gray-900 dark:text-white font-bold focus:outline-none text-lg" onchange="updateCartUI()">
+                    </div>
+                </div>
+                <div class="flex justify-between items-end mb-4">
+                    <span class="text-lg font-bold text-gray-900 dark:text-gray-300" data-i18n="total_pay">Total a Pagar</span>
+                    <span class="text-3xl lg:text-4xl font-black text-yellow-500 tracking-tight" id="summary_total">$0</span>
+                </div>
+                <button id="btnOpenCheckout" class="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-300 dark:disabled:bg-gray-800 disabled:text-gray-500 text-black font-bold py-4 rounded-xl transition shadow-lg flex justify-center items-center gap-2 active:scale-95" disabled>
+                    <span data-i18n="btn_checkout">Siguiente Paso</span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden flex justify-center items-center p-4">
+        <div class="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-neutral-700 w-full max-w-sm p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white" data-i18n="settings">Configuración</h3>
+                <button onclick="toggleSettings()" class="p-2 bg-gray-100 dark:bg-neutral-800 rounded-full text-gray-500 hover:text-gray-900 dark:hover:text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2" data-i18n="language">Idioma</label>
+                    <select id="langSelect" onchange="changeLanguage(this.value)" class="w-full bg-gray-50 dark:bg-neutral-950 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none">
+                        <option value="es">Español</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2" data-i18n="theme">Tema Visual</label>
+                    <div class="flex bg-gray-100 dark:bg-neutral-950 p-1 rounded-lg border border-gray-300 dark:border-neutral-600">
+                        <button onclick="setTheme('light')" class="flex-1 py-3 text-sm font-bold rounded-md focus:outline-none text-gray-700 dark:text-gray-400 transition" id="btn_light">Claro</button>
+                        <button onclick="setTheme('dark')" class="flex-1 py-3 text-sm font-bold rounded-md focus:outline-none bg-white dark:bg-neutral-800 shadow text-gray-900 dark:text-white transition" id="btn_dark">Oscuro</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2" data-i18n="text_size">Tamaño (<span id="textSizeDisplay">16</span>px)</label>
+                    <input type="range" id="textSizeSlider" min="12" max="22" value="16" step="1" class="w-full accent-yellow-500 py-3" oninput="changeTextSize(this.value)">
+                </div>
+                <hr class="border-gray-200 dark:border-neutral-700 my-4">
+                <button onclick="logout()" class="w-full bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 font-bold py-4 rounded-xl transition shadow-sm" data-i18n="logout">Cerrar Sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="checkoutModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex justify-end sm:justify-center items-end sm:items-center sm:p-4">
+        <div class="bg-white dark:bg-neutral-900 rounded-t-3xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-neutral-700 w-full max-w-3xl flex flex-col h-[85vh] sm:h-auto sm:max-h-[90vh]">
+            <div class="p-4 sm:p-6 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center bg-gray-50 dark:bg-neutral-950 rounded-t-3xl sm:rounded-t-2xl">
+                <h3 class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> <span data-i18n="finish_sale">Finalizar Venta</span></h3>
+                <button id="btnCloseCheckout" class="p-2 bg-gray-200 dark:bg-neutral-800 rounded-full text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            
+            <div class="p-4 sm:p-6 overflow-y-auto flex-1">
+                <form id="checkoutForm" class="space-y-6 sm:space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                        <div class="space-y-4">
+                            <h4 class="text-xs uppercase tracking-widest text-yellow-600 dark:text-yellow-500 font-bold mb-2 border-b border-gray-200 dark:border-neutral-700 pb-2" data-i18n="client_data">1. Datos del Cliente</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="name">Nombre / Razón Social</label>
+                                    <input type="text" id="customer_name" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Email del Cliente</label>
+                                    <input type="email" id="customer_email" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Para enviar comprobante (opcional)">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="document">Documento</label>
+                                        <select id="doc_type" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500"><option value="boleta">Boleta</option><option value="factura">Factura</option></select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="rut">RUT</label>
+                                        <input type="text" id="customer_rut" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="text-xs uppercase tracking-widest text-yellow-600 dark:text-yellow-500 font-bold mb-2 border-b border-gray-200 dark:border-neutral-700 pb-2" data-i18n="logistics">2. Logística y Pago</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="pay_method">Medio de Pago</label>
+                                    <select id="payment_method" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" required></select>
+                                </div>
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="channel">Canal Origen</label>
+                                    <select id="sales_channel" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" required></select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="delivery">Entrega</label>
+                                    <select id="fulfillment_method" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500" onchange="toggleShipping()">
+                                        <option value="retiro" data-i18n="pickup">Retiro en Taller</option>
+                                        <option value="delivery" data-i18n="shipping">Despacho Domicilio</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="shipping_cost">Flete ($)</label>
+                                    <input type="number" id="shipping_cost" value="0" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1" data-i18n="notes">Notas de Producción</label>
+                        <textarea id="order_notes" rows="2" class="w-full bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg p-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="p-4 sm:p-6 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-950 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="text-center sm:text-left w-full sm:w-auto">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold" data-i18n="total_register">Total a Registrar</p>
+                    <p class="text-3xl font-black text-yellow-500" id="modal_final_total">$0</p>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row w-full sm:w-auto gap-3">
+                    <button type="button" id="btnConfirmSale" class="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-xl transition shadow-lg text-lg active:scale-95" data-i18n="btn_confirm">Confirmar Transacción</button>
+                    <button type="button" onclick="window.print()" id="btnPrint" class="hidden w-full sm:w-auto bg-neutral-700 hover:bg-neutral-600 text-white font-bold py-4 px-8 rounded-xl transition shadow-lg text-lg active:scale-95">🖨️ Imprimir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="printReceipt" class="hidden p-8 font-mono text-sm">
+        <center>
+            <h1 style="font-size: 20px; font-weight: bold;">S&F ATELIER</h1>
+            <p>Diseño y Manufactura Digital</p>
+            <p>RUT: XX.XXX.XXX-X</p>
+            <p>Valparaíso, Chile</p>
+            <p>syf.atelier@gmail.com | +56 9 3566 2568</p> 
+            <hr style="border: 0.5px dashed black; margin: 10px 0;">
+            <p>FOLIO: <span id="p_folio"></span></p>
+            <p>FECHA: <span id="p_date"></span></p>
+        </center>
+        <div style="margin: 20px 0;">
+            <p>CLIENTE: <span id="p_client"></span></p>
+            <hr style="border: 0.5px dashed black; margin: 10px 0;">
+            <div id="p_items"></div>
+            <hr style="border: 0.5px dashed black; margin: 10px 0;">
+            
+            <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                <span>MONTO NETO:</span> 
+                <span id="p_neto"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                <span>IVA (19%):</span> 
+                <span id="p_iva"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-weight: bold; font-size: 16px; margin-top: 8px;">
+                <span>TOTAL A PAGAR:</span> 
+                <span id="p_total"></span>
+            </div>
+        </div>
+        <center><p style="margin-top: 30px;">¡Gracias por valorar el trabajo artesanal!</p></center>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

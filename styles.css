@@ -1,0 +1,39 @@
+/* Quitar flechas de los inputs numéricos */
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+
+/* Ocultar la barra de scroll pero permitir el scroll táctil */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { 
+    -ms-overflow-style: none; 
+    scrollbar-width: none; 
+}
+
+/* Transiciones suaves generales */
+body { 
+    transition: background-color 0.3s, color 0.3s; 
+    font-size: 16px; 
+}
+
+/* ==========================================
+   ESTILOS EXCLUSIVOS PARA IMPRESORA TÉRMICA 
+   ========================================== */
+@media print {
+    /* Ocultamos todo el POS */
+    body > *:not(#printReceipt) { display: none !important; }
+    
+    /* Mostramos solo la boleta como un bloque estático */
+    #printReceipt { 
+        display: block !important; 
+        position: static !important; 
+        width: 100% !important; 
+        color: black !important; 
+        background: white !important; 
+        font-family: monospace; 
+        margin: 0;
+        padding: 0;
+    }
+}
