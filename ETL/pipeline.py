@@ -1,6 +1,7 @@
 import os
 import duckdb
 import pandas as pd
+import json
 from supabase import create_client
 
 def run_pipeline():
@@ -19,13 +20,29 @@ def run_pipeline():
         print("⚠️ No hay datos para procesar. Saliendo.")
         return
 
+    # Convertimos a DataFrame
     df_raw = pd.DataFrame(data)
+
+    # 🛠️ EL FIX MAESTRO: Convertir diccionarios a JSON strings válidos
+    # Esto asegura que DuckDB reciba comillas dobles (") y no simples (')
+    print("🧹 Limpiando formatos JSON...")
+    
+    columnas_json = ['customer_info', 'raw_payload']
+    
+    for col in columnas_json:
+        if col in df_raw.columns:
+            # json.dumps convierte el objeto de Python en un String JSON estándar
+            df_raw[col] = df_raw[col].apply(lambda x: json.dumps(x) if isinstance(x, (dict, list)) else x)
 
     # 2. CONEXIÓN A MOTHERDUCK (OLAP)
     md_token = os.environ.get("MOTHERDUCK_TOKEN")
     print("🦆 Conectando a MotherDuck...")
-    # Nos conectamos específicamente a la base de datos que creaste
+    # Nos conectamos a tu base de datos específica
     con = duckdb.connect(f"md:sf_atelier_dw?motherduck_token={md_token}")
+    
+    # Nos aseguramos de usar el esquema correcto
+    con.execute("CREATE SCHEMA IF NOT EXISTS main")
+    con.execute("USE sf_atelier_dw.main")
 
     # ==========================================
     # ARQUITECTURA MEDALLÓN
@@ -33,11 +50,11 @@ def run_pipeline():
 
     # 🥉 CAPA BRONZE (Datos Crudos)
     print("🥉 Construyendo capa Bronze...")
-    con.execute("CREATE TABLE IF NOT EXISTS bronze_orders AS SELECT * FROM df_raw LIMIT 0")
-    con.execute("TRUNCATE TABLE bronze_orders")
-    con.execute("INSERT INTO bronze_orders SELECT * FROM df_raw")
+    # Reemplazamos la tabla con los datos nuevos (Full Load por ahora)
+    con.execute("CREATE OR REPLACE TABLE bronze_orders AS SELECT * FROM df_raw")
 
     # 🥈 CAPA SILVER (Datos Limpios y Desanidados)
+    # Aquí usamos el operador ->> sobre los strings que ya son JSON válidos
     print("🥈 Construyendo capa Silver...")
     con.execute("""
         CREATE OR REPLACE TABLE silver_sales AS 
@@ -45,7 +62,7 @@ def run_pipeline():
             id as order_id,
             folio,
             CAST(business_date AS DATE) as fecha_venta,
-            customer_info->>'name' as nombre_cliente,
+            customer_info->>'$.name' as nombre_cliente,
             fulfillment_method as metodo_entrega,
             total_amount as total_venta,
             CAST(raw_payload->'financials'->>'sub' AS DOUBLE) as subtotal_neto,
