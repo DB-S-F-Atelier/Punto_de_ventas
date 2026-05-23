@@ -247,19 +247,14 @@ document.getElementById('btnOpenCheckout').addEventListener('click', () => { upd
 
 document.getElementById('btnCloseCheckout').addEventListener('click', () => { 
     document.getElementById('checkoutModal').classList.add('hidden'); 
-    
     if (document.getElementById('btnConfirmSale').disabled) {
-        cart = []; 
-        document.getElementById('global_discount').value = 0; 
-        document.getElementById('shipping_cost').value = 0;
+        cart = []; document.getElementById('global_discount').value = 0; document.getElementById('shipping_cost').value = 0;
         document.getElementById('checkoutForm').reset(); 
-        
         const btnConfirm = document.getElementById('btnConfirmSale');
         btnConfirm.disabled = false;
         btnConfirm.innerText = i18n[document.getElementById('langSelect').value].btn_confirm;
         btnConfirm.classList.replace('bg-blue-600', 'bg-green-600');
         document.getElementById('btnPrint').classList.add('hidden');
-        
         updateCartUI();
         if(!document.getElementById('cartPanel').classList.contains('translate-x-full')) toggleMobileCart();
     }
@@ -290,8 +285,7 @@ function preparePrintData(folio, name, total) {
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
             <span>${i.qty}x ${i.product.name}</span> 
             <span>$${itemNeto}</span>
-        </div>
-        `;
+        </div>`;
     }).join('');
     
     document.getElementById('btnPrint').classList.remove('hidden');
@@ -304,9 +298,7 @@ function preparePrintData(folio, name, total) {
 document.getElementById('btnConfirmSale').addEventListener('click', async () => {
     const form = document.getElementById('checkoutForm');
     if(!form.checkValidity()) { form.reportValidity(); return; }
-    const btn = document.getElementById('btnConfirmSale'); 
-    btn.disabled = true; 
-    btn.innerText = 'Registrando...';
+    const btn = document.getElementById('btnConfirmSale'); btn.disabled = true; btn.innerText = 'Registrando...';
 
     try {
         const sub = cart.reduce((a, b) => a + (b.qty * b.unit_price), 0);
@@ -323,31 +315,20 @@ document.getElementById('btnConfirmSale').addEventListener('click', async () => 
             notes: document.getElementById('order_notes').value 
         };
 
-        // CAPTURAMOS LOS NOMBRES EN TEXTO PARA EL PDF
         const paySelect = document.getElementById('payment_method');
         const payName = paySelect.options[paySelect.selectedIndex].text;
         
         const fullSelect = document.getElementById('fulfillment_method');
         const fullName = fullSelect.options[fullSelect.selectedIndex].text;
-        
+
         const payload = {
             folio: nuevoFolio,
             business_date: new Date().toISOString().split('T')[0], 
-            customer_info: cust, 
-            document_type: document.getElementById('doc_type').value,
-            sales_channel_id: document.getElementById('sales_channel').value, 
-            payment_method_id: document.getElementById('payment_method').value,
-            total_amount: final, 
-            delivery_status: 'pendiente', 
-            fulfillment_method: document.getElementById('fulfillment_method').value,
-            shipping_cost: ship, 
-            total_discount: disc, 
-            raw_payload: { 
-                cart, 
-                financials: {sub, disc, ship, final},
-                payment_name: payName,       // <-- Enviamos el nombre
-                fulfillment_name: fullName   // <-- Enviamos el nombre
-            }
+            customer_info: cust, document_type: document.getElementById('doc_type').value,
+            sales_channel_id: document.getElementById('sales_channel').value, payment_method_id: document.getElementById('payment_method').value,
+            total_amount: final, delivery_status: 'pendiente', fulfillment_method: document.getElementById('fulfillment_method').value,
+            shipping_cost: ship, total_discount: disc, 
+            raw_payload: { cart, financials: {sub, disc, ship, final}, payment_name: payName, fulfillment_name: fullName }
         };
 
         const { data, error } = await supabaseClient.from('orders').insert([payload]).select('id').single();
@@ -362,11 +343,7 @@ document.getElementById('btnConfirmSale').addEventListener('click', async () => 
 
         preparePrintData(nuevoFolio, cust.name, final);
 
-    } catch (e) { 
-        alert('Error: ' + e.message); 
-        btn.disabled = false; 
-        btn.innerText = i18n[document.getElementById('langSelect').value].btn_confirm; 
-    }
+    } catch (e) { alert('Error: ' + e.message); btn.disabled = false; btn.innerText = i18n[document.getElementById('langSelect').value].btn_confirm; }
 });
 
 // ==========================================
@@ -375,76 +352,126 @@ document.getElementById('btnConfirmSale').addEventListener('click', async () => 
 let globalOrderHistory = [];
 let chartInstance = null;
 
-// Lógica de Navegación de Vistas
+// Lógica de Navegación de Vistas Ampliada
 window.switchView = function(view) {
     const vPos = document.getElementById('view_pos');
     const vDash = document.getElementById('view_dashboard');
+    const vInv = document.getElementById('view_inventory');
     const panelCart = document.getElementById('cartPanel');
     
-    // Botones PC
     const btnPos = document.getElementById('nav_pos');
+    const btnInv = document.getElementById('nav_inv');
     const btnDash = document.getElementById('nav_dash');
+
+    // Apagar paneles
+    vPos.classList.add('hidden');
+    vDash.classList.add('hidden');
+    vInv.classList.add('hidden');
+    
+    // Resetear botones estilo CSS
+    [btnPos, btnInv, btnDash].forEach(b => {
+        if(b) b.classList.remove('bg-yellow-500', 'text-black');
+        if(b) b.classList.add('text-gray-500');
+    });
 
     if (view === 'pos') {
         vPos.classList.remove('hidden');
-        vDash.classList.add('hidden');
-        panelCart.classList.remove('lg:hidden'); // Mostrar carrito en PC
-        
-        if(btnPos) {
-            btnPos.classList.add('bg-yellow-500', 'text-black');
-            btnPos.classList.remove('text-gray-500');
-            btnDash.classList.remove('bg-yellow-500', 'text-black');
-            btnDash.classList.add('text-gray-500');
-        }
+        panelCart.classList.remove('lg:hidden');
+        if(btnPos) btnPos.classList.add('bg-yellow-500', 'text-black');
+    } else if (view === 'inventory') {
+        vInv.classList.remove('hidden');
+        panelCart.classList.add('lg:hidden'); // Expandir espacio
+        if(btnInv) btnInv.classList.add('bg-yellow-500', 'text-black');
+        loadInventoryData(); // Cargar stock en tiempo real
     } else if (view === 'dashboard') {
-        vPos.classList.add('hidden');
         vDash.classList.remove('hidden');
-        panelCart.classList.add('lg:hidden'); // Ocultar carrito en PC para expandir Dashboard
-        
-        if(btnPos) {
-            btnDash.classList.add('bg-yellow-500', 'text-black');
-            btnDash.classList.remove('text-gray-500');
-            btnPos.classList.remove('bg-yellow-500', 'text-black');
-            btnPos.classList.add('text-gray-500');
-        }
-        
-        // Ponemos la fecha de hoy por defecto al entrar
+        panelCart.classList.add('lg:hidden');
+        if(btnDash) btnDash.classList.add('bg-yellow-500', 'text-black');
         if(!document.getElementById('dash_filter_date').value) {
             document.getElementById('dash_filter_date').value = new Date().toISOString().split('T')[0];
         }
-        
         loadDashboardData();
     }
 };
 
-// Carga principal de Datos
-window.loadDashboardData = async function() {
-    const listContainer = document.getElementById('history_list');
-    const dateFilter = document.getElementById('dash_filter_date').value;
-    
-    listContainer.innerHTML = '<p class="text-gray-500 text-center py-10 animate-pulse">Analizando base de datos...</p>';
+// ==========================================
+// 📦 CONTROL DE BODEGA (INVENTARIO AUTOMÁTICO)
+// ==========================================
 
-    // 1. Ejecutamos la Query a Supabase
-    let query = supabaseClient
-        .from('orders')
+// Cargar materiales de Supabase
+window.loadInventoryData = async function() {
+    const list = document.getElementById('inventory_list');
+    list.innerHTML = '<p class="text-gray-500 text-center py-10 animate-pulse">Abriendo bodega virtual...</p>';
+
+    const { data, error } = await supabaseClient
+        .from('materials')
         .select('*')
-        .order('created_at', { ascending: false });
-
-    // Si hay filtro de fecha, lo aplicamos a nivel base de datos
-    if (dateFilter) {
-        query = query.eq('business_date', dateFilter);
-    }
-
-    const { data, error } = await query.limit(100);
+        .order('name', { ascending: true });
 
     if (error) {
-        listContainer.innerHTML = `<p class="text-red-500 text-sm">Error de conexión: ${error.message}</p>`;
+        list.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
         return;
     }
 
-    globalOrderHistory = data || [];
+    if (data.length === 0) {
+        list.innerHTML = '<p class="text-gray-500 text-center py-10">Bodega vacía. Ingresa tu primer material al lado izquierdo.</p>';
+        return;
+    }
 
-    // 2. Calcular KPIs (Indicadores)
+    list.innerHTML = data.map(m => `
+        <div class="bg-gray-50 dark:bg-neutral-950 p-4 rounded-xl border border-gray-200 dark:border-neutral-800 flex justify-between items-center hover:border-yellow-500 transition">
+            <div class="space-y-1">
+                <h4 class="font-bold text-gray-900 dark:text-white text-base">${m.name}</h4>
+                <p class="text-xs text-gray-500 uppercase">Costo: $${m.cost_per_unit.toLocaleString('es-CL')} por ${m.unit_measure}</p>
+                ${m.description ? `<p class="text-xs text-gray-400 dark:text-neutral-400 italic">📝 ${m.description}</p>` : ''}
+            </div>
+            <div class="text-right">
+                <span class="text-lg font-black ${m.stock <= 2 ? 'text-red-500' : 'text-green-500'}">${m.stock}</span>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${m.unit_measure}s</p>
+            </div>
+        </div>
+    `).join('');
+};
+
+// Guardar material desde el Formulario
+document.getElementById('materialForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.innerText = 'Guardando...';
+
+    const payload = {
+        name: document.getElementById('mat_name').value,
+        unit_measure: document.getElementById('mat_unit').value,
+        cost_per_unit: parseInt(document.getElementById('mat_cost').value) || 0,
+        stock: parseFloat(document.getElementById('mat_stock').value) || 0,
+        description: document.getElementById('mat_desc').value // <-- AQUÍ LE AGREGA LA DESCRIPCIÓN A SUPABASE
+    };
+
+    const { error } = await supabaseClient.from('materials').insert([payload]);
+
+    if (error) {
+        alert('Error al guardar: ' + error.message);
+    } else {
+        document.getElementById('materialForm').reset();
+        loadInventoryData(); // Recargar la lista automáticamente
+    }
+    btn.disabled = false; btn.innerText = 'Guardar en Bodega';
+});
+
+
+// Carga principal de Dashboard Historial
+window.loadDashboardData = async function() {
+    const listContainer = document.getElementById('history_list');
+    const dateFilter = document.getElementById('dash_filter_date').value;
+    listContainer.innerHTML = '<p class="text-gray-500 text-center py-10 animate-pulse">Analizando base de datos...</p>';
+
+    let query = supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+    if (dateFilter) query = query.eq('business_date', dateFilter);
+
+    const { data, error } = await query.limit(100);
+    if (error) { listContainer.innerHTML = `<p class="text-red-500 text-sm">Error: ${error.message}</p>`; return; }
+
+    globalOrderHistory = data || [];
     const totalRevenue = data.reduce((sum, order) => sum + order.total_amount, 0);
     const totalOrders = data.length;
     const avgTicket = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
@@ -453,15 +480,12 @@ window.loadDashboardData = async function() {
     document.getElementById('kpi_orders').innerText = totalOrders;
     document.getElementById('kpi_avg').innerText = `$${avgTicket.toLocaleString('es-CL')}`;
 
-    // 3. Renderizar Tabla/Lista
     if (data.length === 0) {
         listContainer.innerHTML = '<p class="text-gray-500 text-center py-10">No hay transacciones en este periodo.</p>';
     } else {
         listContainer.innerHTML = data.map(order => {
-            // Formatear la fecha y hora exacta
             const exactTime = new Date(order.created_at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
             const pMethod = order.raw_payload && order.raw_payload.payment_name ? order.raw_payload.payment_name : 'N/A';
-            
             return `
             <div class="bg-gray-50 dark:bg-neutral-950 p-4 rounded-xl border border-gray-200 dark:border-neutral-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-yellow-500 transition">
                 <div>
@@ -479,87 +503,50 @@ window.loadDashboardData = async function() {
             </div>`;
         }).join('');
     }
-
-    // 4. Actualizar Gráfico
     renderChart(data);
 };
 
-// MOTOR DE REIMPRESIÓN EXACTA
 window.reprintHistoricalOrder = function(orderId) {
     const order = globalOrderHistory.find(o => o.id === orderId);
     if (!order) return;
-
-    // Recuperar el carrito encapsulado en la base de datos
     const historicalCart = order.raw_payload && order.raw_payload.cart ? order.raw_payload.cart : [];
     const total = order.total_amount;
-    
-    // Cálculos de IVA idénticos al checkout
-    const neto = Math.round(total / 1.19);
-    const iva = total - neto;
+    const neto = Math.round(total / 1.19); const iva = total - neto;
 
-    // Inyectar datos en la plantilla de impresión
     document.getElementById('p_folio').innerText = order.folio;
-    // CRÍTICO: La boleta debe mostrar la fecha/hora en la que OCURRIÓ la venta, no la actual
     document.getElementById('p_date').innerText = new Date(order.created_at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
     document.getElementById('p_client').innerText = order.customer_info.name || 'Cliente General';
-    
-    document.getElementById('p_neto').innerText = `$${neto}`;
-    document.getElementById('p_iva').innerText = `$${iva}`;
-    document.getElementById('p_total').innerText = `$${total}`;
+    document.getElementById('p_neto').innerText = `$${neto}`; document.getElementById('p_iva').innerText = `$${iva}`; document.getElementById('p_total').innerText = `$${total}`;
 
     document.getElementById('p_items').innerHTML = historicalCart.map(i => {
-        const itemTotal = i.qty * i.unit_price;
-        const itemNeto = Math.round(itemTotal / 1.19);
+        const itemTotal = i.qty * i.unit_price; const itemNeto = Math.round(itemTotal / 1.19);
         return `
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
-            <span>${i.qty}x ${i.product.name}</span> 
-            <span>$${itemNeto}</span>
+            <span>${i.qty}x ${i.product.name}</span> <span>$${itemNeto}</span>
         </div>`;
     }).join('');
 
-    // Forzar la impresión a través del navegador
-    setTimeout(() => {
-        window.print();
-    }, 300); // Pequeño retraso para asegurar que el DOM se actualizó
+    setTimeout(() => { window.print(); }, 300);
 };
 
-// RENDERIZADO DEL GRÁFICO (Chart.js)
 function renderChart(data) {
-    const ctx = document.getElementById('revenueChart');
-    if(!ctx) return;
-
-    // Destruir gráfico anterior si existe para evitar superposición
+    const ctx = document.getElementById('revenueChart'); if(!ctx) return;
     if(chartInstance) chartInstance.destroy();
 
-    // Lógica Data Analyst: Agrupar ventas por día
     const salesByDate = {};
-    data.forEach(order => {
-        const date = order.business_date;
-        salesByDate[date] = (salesByDate[date] || 0) + order.total_amount;
-    });
-
-    const labels = Object.keys(salesByDate).sort(); // Orden cronológico
-    const chartData = labels.map(date => salesByDate[date]);
+    data.forEach(order => { const date = order.business_date; salesByDate[date] = (salesByDate[date] || 0) + order.total_amount; });
+    const labels = Object.keys(salesByDate).sort(); const chartData = labels.map(date => salesByDate[date]);
 
     chartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels.map(l => l.slice(-5)), // Mostrar solo mes/día "04-18"
-            datasets: [{
-                label: 'Ingresos Netos ($)',
-                data: chartData,
-                backgroundColor: '#EAB308', // yellow-500 de Tailwind
-                borderRadius: 4
-            }]
+            labels: labels.map(l => l.slice(-5)),
+            datasets: [{ label: 'Ingresos Netos ($)', data: chartData, backgroundColor: '#EAB308', borderRadius: 4 }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#333' } },
-                x: { grid: { display: false } }
-            }
+            scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { display: false } } }
         }
     });
 }
